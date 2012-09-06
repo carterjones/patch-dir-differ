@@ -5,8 +5,10 @@
     using System.Linq;
     using System.Security.Cryptography;
     using System.Text;
+    using System.Text.RegularExpressions;
     using System.IO;
     using System.Diagnostics;
+    using DiffMatchPatch;
 
     class Program
     {
@@ -53,6 +55,8 @@
             
             // TODO: Display information about files that are not in one or the other relative directory lists.
 
+            StringBuilder diffHtml = new StringBuilder();
+
             // Compare the files.
             foreach (string relativePath in sharedRelativeDirFiles)
             {
@@ -69,7 +73,42 @@
                     // e.g.:
                     //  - exe/dll: disassembled and then compared
                     //  - txt: simple text diff
+
+                    string extension = Path.GetExtension(absoluteUnpatchedPath);
+                    // Assume plaintext for the following:
+                    // - no file extension
+                    // - txt
+                    // - xml
+
+                    switch(extension)
+                    {
+                        // Plaintext
+                        case ".txt":
+                        case ".xml":
+                        case "":
+                            string unpatchedText = File.ReadAllText(absoluteUnpatchedPath);
+                            string patchedText = File.ReadAllText(absolutePatchedPath);
+                            //string[] diff = GetTextDiff(unpatchedText, patchedText);
+                            diffHtml.Append(relativePath + ":<br />");
+                            diffHtml.Append(OutputDiffToHtml(unpatchedText, patchedText));
+                            diffHtml.Append("<br /><br />");
+                            break;
+
+                        // PE format
+                        case ".dll":
+                        case ".exe":
+                            break;
+
+                        // Other
+                        default:
+                            break;
+                    }
                 }
+            }
+
+            if (diffHtml.Length > 0)
+            {
+                File.WriteAllText("diff.html", diffHtml.ToString());
             }
 
             return;
@@ -168,6 +207,81 @@
                     return formatted.ToString();
                 }
             }
+        }
+
+        private static string OutputDiffToHtml(string s1, string s2)
+        {
+            diff_match_patch dmp = new diff_match_patch();
+            List<Diff> diffs = dmp.diff_main(s1, s2, true);
+            dmp.diff_cleanupSemantic(diffs);
+            return my_diff_prettyHtml(diffs);
+        }
+
+        /**
+         * Convert a Diff list into a pretty HTML report.
+         * @param diffs List of Diff objects.
+         * @return HTML representation.
+         */
+        public static string my_diff_prettyHtml(List<Diff> diffs)
+        {
+            StringBuilder html = new StringBuilder();
+            List<string> last3Lines = new List<string>();
+            foreach (Diff aDiff in diffs)
+            {
+                string text =
+                    aDiff.text.Replace("&", "&amp;")
+                              .Replace("<", "&lt;")
+                              .Replace(">", "&gt;")
+                              .Replace(" ", "&nbsp;")
+                              .Replace("\r", string.Empty)
+                              .Replace("\n", "<br />");
+
+                string[] tmpLines = Regex.Split(text, "(<br />)", RegexOptions.Compiled);
+                for (int i = 0; i < tmpLines.Length - 1; i += 2)
+                {
+                    if (tmpLines[i + 1].Equals("<br />"))
+                    {
+                        tmpLines[i] = tmpLines[i] + "<br />";
+                        tmpLines[i + 1] = string.Empty;
+                    }
+                }
+
+                last3Lines.AddRange(tmpLines.Where(x => !string.IsNullOrEmpty(x)));
+
+                while (last3Lines.Count > 3)
+                {
+                    last3Lines.RemoveAt(0);
+                }
+
+                switch (aDiff.operation)
+                {
+                    case Operation.INSERT:
+                        foreach (string line in last3Lines)
+                        {
+                            html.Append("<span>").Append(line).Append("</span>");
+                        }
+
+                        last3Lines.Clear();
+
+                        html.Append("<ins style=\"background:#e6ffe6;\">").Append(text).Append("</ins>");
+                        break;
+                    case Operation.DELETE:
+                        foreach (string line in last3Lines)
+                        {
+                            html.Append("<span>").Append(line).Append("</span>");
+                        }
+
+                        last3Lines.Clear();
+
+                        html.Append("<del style=\"background:#ffe6e6;\">").Append(text).Append("</del>");
+                        break;
+                    case Operation.EQUAL:
+                        // TODO: only append lines before and after differences
+                        //html.Append("<span>").Append(text).Append("</span>");
+                        break;
+                }
+            }
+            return html.ToString();
         }
     }
 }
