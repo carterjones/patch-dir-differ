@@ -18,6 +18,9 @@
             Console.WriteLine("usage: " + Process.GetCurrentProcess().ProcessName + " <unpatched dir> <patched dir>");
         }
 
+        // TODO: make link at top of document to jump directly to the changes made in files
+        // TODO: display percent change for each file
+
         static void Main(string[] args)
         {
             if (args.Length != 2)
