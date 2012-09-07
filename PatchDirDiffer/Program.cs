@@ -91,7 +91,7 @@
                             //string[] diff = GetTextDiff(unpatchedText, patchedText);
                             diffHtml.Append(relativePath + ":<br />");
                             diffHtml.Append(OutputDiffToHtml(unpatchedText, patchedText));
-                            diffHtml.Append("<br /><br />");
+                            diffHtml.Append("<br /><hr /><br />");
                             break;
 
                         // PE format
@@ -225,7 +225,6 @@
         public static string my_diff_prettyHtml(List<Diff> diffs)
         {
             StringBuilder html = new StringBuilder();
-            List<string> last3Lines = new List<string>();
             foreach (Diff aDiff in diffs)
             {
                 string text =
@@ -236,52 +235,92 @@
                               .Replace("\r", string.Empty)
                               .Replace("\n", "<br />");
 
-                string[] tmpLines = Regex.Split(text, "(<br />)", RegexOptions.Compiled);
-                for (int i = 0; i < tmpLines.Length - 1; i += 2)
-                {
-                    if (tmpLines[i + 1].Equals("<br />"))
-                    {
-                        tmpLines[i] = tmpLines[i] + "<br />";
-                        tmpLines[i + 1] = string.Empty;
-                    }
-                }
-
-                last3Lines.AddRange(tmpLines.Where(x => !string.IsNullOrEmpty(x)));
-
-                while (last3Lines.Count > 3)
-                {
-                    last3Lines.RemoveAt(0);
-                }
-
                 switch (aDiff.operation)
                 {
                     case Operation.INSERT:
-                        foreach (string line in last3Lines)
-                        {
-                            html.Append("<span>").Append(line).Append("</span>");
-                        }
-
-                        last3Lines.Clear();
-
                         html.Append("<ins style=\"background:#e6ffe6;\">").Append(text).Append("</ins>");
                         break;
                     case Operation.DELETE:
-                        foreach (string line in last3Lines)
-                        {
-                            html.Append("<span>").Append(line).Append("</span>");
-                        }
-
-                        last3Lines.Clear();
-
                         html.Append("<del style=\"background:#ffe6e6;\">").Append(text).Append("</del>");
                         break;
                     case Operation.EQUAL:
-                        // TODO: only append lines before and after differences
-                        //html.Append("<span>").Append(text).Append("</span>");
+                        html.Append("<span>").Append(text).Append("</span>");
                         break;
                 }
             }
-            return html.ToString();
+
+            return RemoveUnchangedLines(html.ToString());
+        }
+
+        private static string RemoveUnchangedLines(string html, int numLinesBefore = 1, int numLinesAfter = 1)
+        {
+            StringBuilder filteredLines = new StringBuilder();
+            string[] lines = html.Split(new string[] { "<br />" }, StringSplitOptions.RemoveEmptyEntries);
+            List<DiffedLine> diffedLines = new List<DiffedLine>();
+            for (int i = 0; i < lines.Length; ++i)
+            {
+                DiffedLine dl = new DiffedLine();
+                dl.IsChange =
+                    lines[i].Contains("<ins ") |
+                    lines[i].Contains("<del ") |
+                    lines[i].Contains("</ins>") |
+                    lines[i].Contains("</del>");
+                dl.Show = dl.IsChange;
+                dl.Text = lines[i];
+                dl.LineNumber = i;
+                diffedLines.Add(dl);
+            }
+
+            for (int i = 0; i < diffedLines.Count; ++i)
+            {
+                if (diffedLines[i].IsChange)
+                {
+                    for (int j = i - 1; j > 0 && j > i - 1 - numLinesBefore; --j)
+                    {
+                        diffedLines[j].Show = true;
+                    }
+
+                    for (int k = i + 1; k < diffedLines.Count && k < i + 1 + numLinesAfter; ++k)
+                    {
+                        diffedLines[k].Show = true;
+                    }
+                }
+            }
+
+            int lastShownLineNumber = -1;
+            foreach (DiffedLine dl in diffedLines)
+            {
+                if (dl.Show)
+                {
+                    if (lastShownLineNumber != -1)
+                    {
+                        if (lastShownLineNumber + 1 != dl.LineNumber)
+                        {
+                            filteredLines.Append("...<br />");
+                        }
+                    }
+
+                    lastShownLineNumber = dl.LineNumber;
+                    if (dl.IsChange)
+                    {
+                        filteredLines.Append("<b><i>" + dl.LineNumber + "</i></b>: " + dl.Text + "<br />");
+                    }
+                    else
+                    {
+                        filteredLines.Append(dl.LineNumber + ": " + dl.Text + "<br />");
+                    }
+                }
+            }
+
+            return filteredLines.ToString();
+        }
+
+        private class DiffedLine
+        {
+            public bool Show { get; set; }
+            public bool IsChange { get; set; }
+            public string Text { get; set; }
+            public int LineNumber { get; set; }
         }
     }
 }
