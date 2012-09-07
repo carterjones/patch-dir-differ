@@ -9,6 +9,7 @@
     using System.IO;
     using System.Diagnostics;
     using DiffMatchPatch;
+    using Nouzuru;
 
     class Program
     {
@@ -88,7 +89,6 @@
                         case "":
                             string unpatchedText = File.ReadAllText(absoluteUnpatchedPath);
                             string patchedText = File.ReadAllText(absolutePatchedPath);
-                            //string[] diff = GetTextDiff(unpatchedText, patchedText);
                             diffHtml.Append(relativePath + ":<br />");
                             diffHtml.Append(OutputDiffToHtml(unpatchedText, patchedText));
                             diffHtml.Append("<br /><hr /><br />");
