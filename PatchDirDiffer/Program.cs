@@ -9,7 +9,7 @@
     using System.IO;
     using System.Diagnostics;
     using DiffMatchPatch;
-    using Nouzuru;
+    using Bunseki;
 
     class Program
     {
@@ -58,6 +58,9 @@
 
             StringBuilder diffHtml = new StringBuilder();
 
+            // Clear the destination file.
+            File.Delete("diff.html");
+
             // Compare the files.
             foreach (string relativePath in sharedRelativeDirFiles)
             {
@@ -81,34 +84,61 @@
                     // - txt
                     // - xml
 
+                    string unpatchedText = string.Empty;
+                    string patchedText = string.Empty;
+
                     switch(extension)
                     {
                         // Plaintext
                         case ".txt":
                         case ".xml":
                         case "":
-                            string unpatchedText = File.ReadAllText(absoluteUnpatchedPath);
-                            string patchedText = File.ReadAllText(absolutePatchedPath);
-                            diffHtml.Append(relativePath + ":<br />");
-                            diffHtml.Append(OutputDiffToHtml(unpatchedText, patchedText));
-                            diffHtml.Append("<br /><hr /><br />");
+                            unpatchedText = File.ReadAllText(absoluteUnpatchedPath);
+                            patchedText = File.ReadAllText(absolutePatchedPath);
                             break;
 
                         // PE format
                         case ".dll":
                         case ".exe":
+                            byte[] unpatchedBytes = File.ReadAllBytes(absoluteUnpatchedPath);
+                            byte[] patchedBytes = File.ReadAllBytes(absolutePatchedPath);
+                            Disassembler d = new Disassembler();
+                            d.Engine = Disassembler.InternalDisassembler.BeaEngine;
+                            try
+                            {
+                                List<Instruction> unpatchedInstructions = d.DisassembleInstructions(unpatchedBytes);
+                                List<Instruction> patchedInstructions = d.DisassembleInstructions(patchedBytes);
+                                unpatchedText = string.Join("\n", unpatchedInstructions.Select(x => x.ToString()));
+                                patchedText = string.Join("\n", patchedInstructions.Select(x => x.ToString()));
+                            }
+                            catch (Exception e)
+                            {
+                                diffHtml.Append(relativePath + ":<br />");
+                                diffHtml.Append(e.Message);
+                                diffHtml.Append("<br /><hr /><br />");
+                                File.AppendAllText("diff.html", diffHtml.ToString());
+                                diffHtml.Clear();
+                                unpatchedText = string.Empty;
+                                patchedText = string.Empty;
+                            }
                             break;
 
                         // Other
                         default:
+                            unpatchedText = string.Empty;
+                            patchedText = string.Empty;
                             break;
                     }
-                }
-            }
 
-            if (diffHtml.Length > 0)
-            {
-                File.WriteAllText("diff.html", diffHtml.ToString());
+                    if (!string.IsNullOrEmpty(unpatchedText) && !string.IsNullOrEmpty(patchedText))
+                    {
+                        diffHtml.Append(relativePath + ":<br />");
+                        diffHtml.Append(OutputDiffToHtml(unpatchedText, patchedText));
+                        diffHtml.Append("<br /><hr /><br />");
+                        File.AppendAllText("diff.html", diffHtml.ToString());
+                        diffHtml.Clear();
+                    }
+                }
             }
 
             return;
