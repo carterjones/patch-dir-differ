@@ -258,6 +258,9 @@
         public static string my_diff_prettyHtml(List<Diff> diffs)
         {
             StringBuilder html = new StringBuilder();
+            ulong numBytesInserted = 0;
+            ulong numBytesDeleted = 0;
+            ulong numBytesEqual = 0;
             foreach (Diff aDiff in diffs)
             {
                 string text =
@@ -271,18 +274,34 @@
                 switch (aDiff.operation)
                 {
                     case Operation.INSERT:
+                        numBytesInserted += (ulong)aDiff.text.Length;
                         html.Append("<ins style=\"background:#e6ffe6;\">").Append(text).Append("</ins>");
                         break;
                     case Operation.DELETE:
+                        numBytesDeleted += (ulong)aDiff.text.Length;
                         html.Append("<del style=\"background:#ffe6e6;\">").Append(text).Append("</del>");
                         break;
                     case Operation.EQUAL:
+                        numBytesEqual += (ulong)aDiff.text.Length;
                         html.Append("<span>").Append(text).Append("</span>");
                         break;
                 }
             }
 
-            return RemoveUnchangedLines(html.ToString());
+            ulong numBytesOld = numBytesEqual + numBytesDeleted;
+            ulong numBytesNew = numBytesEqual + numBytesInserted;
+
+            double percentChangeOld = ((double)numBytesDeleted / (double)numBytesOld) * 100;
+            double percentChangeNew = ((double)numBytesInserted / (double)numBytesNew) * 100;
+            double percentChangeAverage = (percentChangeOld + percentChangeNew) / 2;
+
+            StringBuilder output = new StringBuilder();
+            output.Append(
+                "percentage change: " +
+                string.Format("{0:0.0000}%", percentChangeAverage) +
+                "<br /><br />");
+            output.Append(RemoveUnchangedLines(html.ToString()));
+            return output.ToString();
         }
 
         private static string RemoveUnchangedLines(string html, int numLinesBefore = 1, int numLinesAfter = 1)
