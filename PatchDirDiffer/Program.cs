@@ -19,7 +19,8 @@
         }
 
         // TODO: make link at top of document to jump directly to the changes made in files
-        // TODO: display percent change for each file
+        // TODO: display number of bytes deleted/inserted
+        // TODO: display stats at the top of the page
 
         static void Main(string[] args)
         {
@@ -59,7 +60,9 @@
             
             // TODO: Display information about files that are not in one or the other relative directory lists.
 
-            StringBuilder diffHtml = new StringBuilder();
+            StringBuilder totalHtml = new StringBuilder();
+            StringBuilder currentHtml = new StringBuilder();
+            List<ChangeStats> totalStats = new List<ChangeStats>();
 
             // Clear the destination file.
             File.Delete("diff.html");
@@ -89,6 +92,9 @@
 
                     string unpatchedText = string.Empty;
                     string patchedText = string.Empty;
+                    string diffData = string.Empty;
+                    ChangeStats cs = new ChangeStats();
+                    cs.RelativePath = relativePath;
 
                     switch(extension)
                     {
@@ -98,6 +104,7 @@
                         case "":
                             unpatchedText = File.ReadAllText(absoluteUnpatchedPath);
                             patchedText = File.ReadAllText(absolutePatchedPath);
+                            diffData = OutputDiffToHtml(unpatchedText, patchedText, cs);
                             break;
 
                         // PE format
@@ -107,42 +114,76 @@
                             byte[] patchedBytes = File.ReadAllBytes(absolutePatchedPath);
                             Disassembler d = new Disassembler();
                             d.Engine = Disassembler.InternalDisassembler.BeaEngine;
+
                             try
                             {
                                 List<Instruction> unpatchedInstructions = d.DisassembleInstructions(unpatchedBytes);
                                 List<Instruction> patchedInstructions = d.DisassembleInstructions(patchedBytes);
                                 unpatchedText = string.Join("\n", unpatchedInstructions.Select(x => x.ToString()));
                                 patchedText = string.Join("\n", patchedInstructions.Select(x => x.ToString()));
+                                diffData = OutputDiffToHtml(unpatchedText, patchedText, cs);
                             }
                             catch (Exception e)
                             {
-                                diffHtml.Append(relativePath + ":<br />");
-                                diffHtml.Append(e.Message);
-                                diffHtml.Append("<br /><hr /><br />");
-                                File.AppendAllText("diff.html", diffHtml.ToString());
-                                diffHtml.Clear();
                                 unpatchedText = string.Empty;
                                 patchedText = string.Empty;
+                                diffData = e.Message;
                             }
+
                             break;
 
                         // Other
                         default:
                             unpatchedText = string.Empty;
                             patchedText = string.Empty;
+                            diffData = string.Empty;
                             break;
                     }
 
-                    if (!string.IsNullOrEmpty(unpatchedText) && !string.IsNullOrEmpty(patchedText))
-                    {
-                        diffHtml.Append(relativePath + ":<br />");
-                        diffHtml.Append(OutputDiffToHtml(unpatchedText, patchedText));
-                        diffHtml.Append("<br /><hr /><br />");
-                        File.AppendAllText("diff.html", diffHtml.ToString());
-                        diffHtml.Clear();
-                    }
+                    currentHtml.Append("<a name=\"" + cs.PathHash + "\">" + relativePath + "</a>:<br />");
+                    currentHtml.Append(diffData);
+                    currentHtml.Append("<br /><hr /><br />");
+                    File.AppendAllText("diff.html", currentHtml.ToString());
+                    totalHtml.Append(currentHtml.ToString());
+                    totalStats.Add(cs);
+                    currentHtml.Clear();
                 }
             }
+
+            // Display diff stats in a table at the top. Re-write the whole file to add this information.
+            totalHtml.Insert(
+                0,
+                "<html><head><script src=\"sorttable.js\"></script><style>" +
+                "table.sortable thead { background-color:#eee; color:#666666; font-weight: bold; cursor: default; }" +
+                "</style></head><body>");
+            StringBuilder statsHtml = new StringBuilder();
+            statsHtml.Append("<table border=\"1\" class=\"sortable\">");
+            statsHtml.Append("<tr>");
+            statsHtml.Append("<td>Relative Path</td>");
+            statsHtml.Append("<td>Percent Change</td>");
+            statsHtml.Append("<td># bytes deleted</td>");
+            statsHtml.Append("<td># bytes inserted</td>");
+            statsHtml.Append("<td>total # bytes (unpatched)");
+            statsHtml.Append("<td>total # bytes (patched)");
+            statsHtml.Append("</tr>");
+            foreach (ChangeStats cs in totalStats)
+            {
+                statsHtml.Append("<tr>");
+                statsHtml.Append("<td><a href=\"#" + cs.PathHash + "\">" + cs.RelativePath + "</a></td>");
+                statsHtml.Append("<td>" + string.Format("{0:0.0000}%", cs.PercentChanged) + "</td>");
+                statsHtml.Append("<td>" + cs.NumBytesDeleted + "</td>");
+                statsHtml.Append("<td>" + cs.NumBytesInserted + "</td>");
+                statsHtml.Append("<td>" + cs.NumBytesOld + "</td>");
+                statsHtml.Append("<td>" + cs.NumBytesNew + "</td>");
+                statsHtml.Append("</tr>");
+            }
+
+            statsHtml.Append("</table><br /><hr /><br />");
+            totalHtml.Insert(0, statsHtml.ToString());
+            totalHtml.Append("</body></html>");
+
+            // Write the table to the top of the diff file.
+            File.WriteAllText("diff.html", totalHtml.ToString());
 
             return;
         }
@@ -181,6 +222,21 @@
 
             // At this point, the odds are large that the file contents are the same.
             return true;
+        }
+
+        private static string GetMD5OfString(string s)
+        {
+            MemoryStream ms = new MemoryStream();
+            MD5 md5 = new MD5CryptoServiceProvider();
+            byte[] retVal = md5.ComputeHash(s.GetBytes());
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < retVal.Length; i++)
+            {
+                sb.Append(retVal[i].ToString("x2"));
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>
@@ -242,12 +298,12 @@
             }
         }
 
-        private static string OutputDiffToHtml(string s1, string s2)
+        private static string OutputDiffToHtml(string s1, string s2, ChangeStats cs)
         {
             diff_match_patch dmp = new diff_match_patch();
             List<Diff> diffs = dmp.diff_main(s1, s2, true);
             dmp.diff_cleanupSemantic(diffs);
-            return my_diff_prettyHtml(diffs);
+            return my_diff_prettyHtml(diffs, cs);
         }
 
         /**
@@ -255,7 +311,7 @@
          * @param diffs List of Diff objects.
          * @return HTML representation.
          */
-        public static string my_diff_prettyHtml(List<Diff> diffs)
+        private static string my_diff_prettyHtml(List<Diff> diffs, ChangeStats cs)
         {
             StringBuilder html = new StringBuilder();
             ulong numBytesInserted = 0;
@@ -295,12 +351,19 @@
             double percentChangeNew = ((double)numBytesInserted / (double)numBytesNew) * 100;
             double percentChangeAverage = (percentChangeOld + percentChangeNew) / 2;
 
+            cs.PercentChanged = percentChangeAverage;
+            cs.NumBytesDeleted = numBytesDeleted;
+            cs.NumBytesInserted = numBytesInserted;
+            cs.NumBytesOld = numBytesOld;
+            cs.NumBytesNew = numBytesNew;
+
             StringBuilder output = new StringBuilder();
             output.Append(
                 "percentage change: " +
                 string.Format("{0:0.0000}%", percentChangeAverage) +
                 "<br /><br />");
             output.Append(RemoveUnchangedLines(html.ToString()));
+
             return output.ToString();
         }
 
@@ -373,6 +436,23 @@
             public bool IsChange { get; set; }
             public string Text { get; set; }
             public int LineNumber { get; set; }
+        }
+
+        private class ChangeStats
+        {
+            public string PathHash
+            {
+                get
+                {
+                    return GetMD5OfString(this.RelativePath);
+                }
+            }
+            public string RelativePath { get; set; }
+            public double PercentChanged { get; set; }
+            public ulong NumBytesInserted { get; set; }
+            public ulong NumBytesDeleted { get; set; }
+            public ulong NumBytesOld { get; set; }
+            public ulong NumBytesNew { get; set; }
         }
     }
 }
