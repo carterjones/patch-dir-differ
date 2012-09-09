@@ -16,7 +16,13 @@
     /// </summary>
     public class Program
     {
-        // TODO: Display information about files that are not in one or the other relative directory lists.
+        /// <summary>
+        /// The main function that is run upon execution.
+        /// </summary>
+        /// <remarks>
+        /// TODO: Display information about files that are not in one or the other relative directory lists.
+        /// </remarks>
+        /// <param name="args">Command line arguments passed to the program.</param>
         public static void Main(string[] args)
         {
             if (args.Length != 2)
@@ -83,7 +89,7 @@
                         case "":
                             unpatchedText = File.ReadAllText(absoluteUnpatchedPath);
                             patchedText = File.ReadAllText(absolutePatchedPath);
-                            diffData = OutputDiffToHtml(unpatchedText, patchedText, cs);
+                            diffData = GetDiffAsHtml(unpatchedText, patchedText, cs);
                             break;
 
                         // PE format
@@ -100,7 +106,7 @@
                                 List<Instruction> patchedInstructions = d.DisassembleInstructions(patchedBytes);
                                 unpatchedText = string.Join("\n", unpatchedInstructions.Select(x => x.ToString()));
                                 patchedText = string.Join("\n", patchedInstructions.Select(x => x.ToString()));
-                                diffData = OutputDiffToHtml(unpatchedText, patchedText, cs);
+                                diffData = GetDiffAsHtml(unpatchedText, patchedText, cs);
                             }
                             catch (Exception e)
                             {
@@ -167,6 +173,9 @@
             return;
         }
 
+        /// <summary>
+        /// Prints the command line usage instructions to the console.
+        /// </summary>
         private static void PrintUsage()
         {
             Console.WriteLine("usage: " + Process.GetCurrentProcess().ProcessName + " <unpatched dir> <patched dir>");
@@ -208,6 +217,11 @@
             return true;
         }
 
+        /// <summary>
+        /// Retrieves the MD5 hash of the supplied string.
+        /// </summary>
+        /// <param name="s">The string to be hashed.</param>
+        /// <returns>the MD5 hash of the string</returns>
         private static string GetMD5OfString(string s)
         {
             MemoryStream ms = new MemoryStream();
@@ -282,7 +296,14 @@
             }
         }
 
-        private static string OutputDiffToHtml(string s1, string s2, ChangeStats cs)
+        /// <summary>
+        /// Discovers the differences between two strings and transforms the differences into HTML representation.
+        /// </summary>
+        /// <param name="s1">The first string to be compared.</param>
+        /// <param name="s2">The second string to be compared.</param>
+        /// <param name="cs">Change statistics that will be set during the diffing process.</param>
+        /// <returns>the HTML representation of the differences between the two strings</returns>
+        private static string GetDiffAsHtml(string s1, string s2, ChangeStats cs)
         {
             diff_match_patch dmp = new diff_match_patch();
             List<Diff> diffs = dmp.diff_main(s1, s2, true);
@@ -423,19 +444,41 @@
             return filteredLines.ToString();
         }
 
+        /// <summary>
+        /// Represents a line that has been processed. This is an intermediary object used for minimizing which line
+        /// differences will be shown in the final output.
+        /// </summary>
         private class DiffedLine
         {
+            /// <summary>
+            /// Gets or sets a value indicating whether this line will be shown.
+            /// </summary>
             public bool Show { get; set; }
 
+            /// <summary>
+            /// Gets or sets a value indicating whether an insertion or deletion occurred on this line.
+            /// </summary>
             public bool IsChange { get; set; }
 
+            /// <summary>
+            /// Gets or sets the actual line of text.
+            /// </summary>
             public string Text { get; set; }
 
+            /// <summary>
+            /// Gets or sets the line number of this text.
+            /// </summary>
             public int LineNumber { get; set; }
         }
 
+        /// <summary>
+        /// Statistics about the changes that have taken place within a single file.
+        /// </summary>
         private class ChangeStats
         {
+            /// <summary>
+            /// Gets a hash of this relative path. Used for unique identification purposes.
+            /// </summary>
             public string PathHash
             {
                 get
@@ -444,16 +487,34 @@
                 }
             }
 
+            /// <summary>
+            /// Gets or sets the relative path to this file.
+            /// </summary>
             public string RelativePath { get; set; }
 
+            /// <summary>
+            /// Gets or sets the percentage change of the file from the old to the new version.
+            /// </summary>
             public double PercentChanged { get; set; }
 
+            /// <summary>
+            /// Gets or sets the number of bytes inserted into the file.
+            /// </summary>
             public ulong NumBytesInserted { get; set; }
 
+            /// <summary>
+            /// Gets or sets the number of bytes deleted from the file.
+            /// </summary>
             public ulong NumBytesDeleted { get; set; }
 
+            /// <summary>
+            /// Gets or sets the number of bytes within the original file.
+            /// </summary>
             public ulong NumBytesOld { get; set; }
 
+            /// <summary>
+            /// Gets or sets the number of bytes within the patched file.
+            /// </summary>
             public ulong NumBytesNew { get; set; }
         }
     }
