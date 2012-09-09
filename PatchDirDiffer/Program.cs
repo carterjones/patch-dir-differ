@@ -2,27 +2,22 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.IO;
     using System.Linq;
     using System.Security.Cryptography;
     using System.Text;
     using System.Text.RegularExpressions;
-    using System.IO;
-    using System.Diagnostics;
-    using DiffMatchPatch;
     using Bunseki;
+    using DiffMatchPatch;
 
-    class Program
+    /// <summary>
+    /// The main program class to be run upon execution.
+    /// </summary>
+    public class Program
     {
-        private static void PrintUsage()
-        {
-            Console.WriteLine("usage: " + Process.GetCurrentProcess().ProcessName + " <unpatched dir> <patched dir>");
-        }
-
-        // TODO: make link at top of document to jump directly to the changes made in files
-        // TODO: display number of bytes deleted/inserted
-        // TODO: display stats at the top of the page
-
-        static void Main(string[] args)
+        // TODO: Display information about files that are not in one or the other relative directory lists.
+        public static void Main(string[] args)
         {
             if (args.Length != 2)
             {
@@ -57,8 +52,6 @@
 
             // Get a set of common relative directory paths.
             string[] sharedRelativeDirFiles = relativePatchedDirFiles.Intersect(relativeUnpatchedDirFiles).ToArray();
-            
-            // TODO: Display information about files that are not in one or the other relative directory lists.
 
             StringBuilder totalHtml = new StringBuilder();
             StringBuilder currentHtml = new StringBuilder();
@@ -72,31 +65,17 @@
             {
                 string absoluteUnpatchedPath = unpatchedDir + relativePath;
                 string absolutePatchedPath = patchedDir + relativePath;
-                if (AreFileContentsEqual(absoluteUnpatchedPath, absolutePatchedPath))
-                {
-                    //Console.WriteLine("Equal: " + relativePath);
-                }
-                else
+                if (!AreFileContentsEqual(absoluteUnpatchedPath, absolutePatchedPath))
                 {
                     Console.WriteLine("Not equal: " + relativePath);
-                    // Do something like diffing based on filetype.
-                    // e.g.:
-                    //  - exe/dll: disassembled and then compared
-                    //  - txt: simple text diff
-
                     string extension = Path.GetExtension(absoluteUnpatchedPath);
-                    // Assume plaintext for the following:
-                    // - no file extension
-                    // - txt
-                    // - xml
-
                     string unpatchedText = string.Empty;
                     string patchedText = string.Empty;
                     string diffData = string.Empty;
                     ChangeStats cs = new ChangeStats();
                     cs.RelativePath = relativePath;
 
-                    switch(extension)
+                    switch (extension)
                     {
                         // Plaintext
                         case ".txt":
@@ -151,11 +130,11 @@
             }
 
             // Display diff stats in a table at the top. Re-write the whole file to add this information.
-            totalHtml.Insert(
-                0,
+            string introHtml =
                 "<html><head><script src=\"sorttable.js\"></script><style>" +
                 "table.sortable thead { background-color:#eee; color:#666666; font-weight: bold; cursor: default; }" +
-                "</style></head><body>");
+                "</style></head><body>";
+            totalHtml.Insert(0, introHtml);
             StringBuilder statsHtml = new StringBuilder();
             statsHtml.Append("<table border=\"1\" class=\"sortable\">");
             statsHtml.Append("<tr>");
@@ -186,6 +165,11 @@
             File.WriteAllText("diff.html", totalHtml.ToString());
 
             return;
+        }
+
+        private static void PrintUsage()
+        {
+            Console.WriteLine("usage: " + Process.GetCurrentProcess().ProcessName + " <unpatched dir> <patched dir>");
         }
 
         /// <summary>
@@ -303,42 +287,43 @@
             diff_match_patch dmp = new diff_match_patch();
             List<Diff> diffs = dmp.diff_main(s1, s2, true);
             dmp.diff_cleanupSemantic(diffs);
-            return my_diff_prettyHtml(diffs, cs);
+            return DiffsToHtml(diffs, cs);
         }
 
-        /**
-         * Convert a Diff list into a pretty HTML report.
-         * @param diffs List of Diff objects.
-         * @return HTML representation.
-         */
-        private static string my_diff_prettyHtml(List<Diff> diffs, ChangeStats cs)
+        /// <summary>
+        /// Convert a Diff list into a pretty HTML report.
+        /// </summary>
+        /// <param name="diffs">The diffs to be converted to HTML format.</param>
+        /// <param name="cs">The change statistics for this set of Diffs.</param>
+        /// <returns>the HTML representation of the diffs</returns>
+        private static string DiffsToHtml(List<Diff> diffs, ChangeStats cs)
         {
             StringBuilder html = new StringBuilder();
             ulong numBytesInserted = 0;
             ulong numBytesDeleted = 0;
             ulong numBytesEqual = 0;
-            foreach (Diff aDiff in diffs)
+            foreach (Diff diff in diffs)
             {
                 string text =
-                    aDiff.text.Replace("&", "&amp;")
+                    diff.text.Replace("&", "&amp;")
                               .Replace("<", "&lt;")
                               .Replace(">", "&gt;")
                               .Replace(" ", "&nbsp;")
                               .Replace("\r", string.Empty)
                               .Replace("\n", "<br />");
 
-                switch (aDiff.operation)
+                switch (diff.operation)
                 {
                     case Operation.INSERT:
-                        numBytesInserted += (ulong)aDiff.text.Length;
+                        numBytesInserted += (ulong)diff.text.Length;
                         html.Append("<ins style=\"background:#e6ffe6;\">").Append(text).Append("</ins>");
                         break;
                     case Operation.DELETE:
-                        numBytesDeleted += (ulong)aDiff.text.Length;
+                        numBytesDeleted += (ulong)diff.text.Length;
                         html.Append("<del style=\"background:#ffe6e6;\">").Append(text).Append("</del>");
                         break;
                     case Operation.EQUAL:
-                        numBytesEqual += (ulong)aDiff.text.Length;
+                        numBytesEqual += (ulong)diff.text.Length;
                         html.Append("<span>").Append(text).Append("</span>");
                         break;
                 }
@@ -367,6 +352,14 @@
             return output.ToString();
         }
 
+        /// <summary>
+        /// Remove lines that were unchanged in the diff. Optionally state how many lines above and below differences
+        /// will be shown.
+        /// </summary>
+        /// <param name="html">The html representation of the diffs.</param>
+        /// <param name="numLinesBefore">The number of equal lines above each difference to be shown.</param>
+        /// <param name="numLinesAfter">The number of equal lines below each difference to be shown.</param>
+        /// <returns>the reduced HTML representation of the diffs</returns>
         private static string RemoveUnchangedLines(string html, int numLinesBefore = 1, int numLinesAfter = 1)
         {
             StringBuilder filteredLines = new StringBuilder();
@@ -433,8 +426,11 @@
         private class DiffedLine
         {
             public bool Show { get; set; }
+
             public bool IsChange { get; set; }
+
             public string Text { get; set; }
+
             public int LineNumber { get; set; }
         }
 
@@ -447,11 +443,17 @@
                     return GetMD5OfString(this.RelativePath);
                 }
             }
+
             public string RelativePath { get; set; }
+
             public double PercentChanged { get; set; }
+
             public ulong NumBytesInserted { get; set; }
+
             public ulong NumBytesDeleted { get; set; }
+
             public ulong NumBytesOld { get; set; }
+
             public ulong NumBytesNew { get; set; }
         }
     }
