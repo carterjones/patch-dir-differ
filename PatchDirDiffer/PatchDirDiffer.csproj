@@ -74,7 +74,7 @@
     <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\plugins\nouzuru\plugins\bunseki\Bunseki\Bunseki.csproj">
+    <ProjectReference Include="..\..\bunseki\Bunseki\Bunseki.csproj">
       <Project>{AF903833-3F53-42BC-ADA1-797D9709EA3C}</Project>
       <Name>Bunseki</Name>
     </ProjectReference>
