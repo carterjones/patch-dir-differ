@@ -102,8 +102,10 @@
 
                             try
                             {
-                                List<Instruction> unpatchedInstructions = d.DisassembleInstructions(unpatchedBytes);
-                                List<Instruction> patchedInstructions = d.DisassembleInstructions(patchedBytes);
+                                IEnumerable<Instruction> unpatchedInstructions =
+                                    d.DisassembleInstructions(unpatchedBytes);
+                                IEnumerable<Instruction> patchedInstructions =
+                                    d.DisassembleInstructions(patchedBytes);
                                 unpatchedText = string.Join("\n", unpatchedInstructions.Select(x => x.ToString()));
                                 patchedText = string.Join("\n", patchedInstructions.Select(x => x.ToString()));
                                 diffData = GetDiffAsHtml(unpatchedText, patchedText, cs);
