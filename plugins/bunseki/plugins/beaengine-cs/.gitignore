@@ -6,9 +6,9 @@
 !*.settings
 !*.sln
 !*.vcxproj
-!PatchDirDiffer
-!PatchDirDiffer/Properties
+!BeaEngineCS
+!Tests
 !plugins
-!plugins/bunseki
-!README.md
+!plugins/beaengine
 !LICENSE
+!README.md
