@@ -80,6 +80,10 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>if exist $(SolutionDir)plugins\bunseki\plugins\beaengine-cs\plugins\beaengine\$(ConfigurationName)\BeaEngine-32.dll copy $(SolutionDir)plugins\bunseki\plugins\beaengine-cs\plugins\beaengine\$(ConfigurationName)\BeaEngine-32.dll $(TargetDir)BeaEngine-32.dll
+if exist $(SolutionDir)plugins\bunseki\plugins\beaengine-cs\plugins\beaengine\$(ConfigurationName)\BeaEngine-64.dll copy $(SolutionDir)plugins\bunseki\plugins\beaengine-cs\plugins\beaengine\$(ConfigurationName)\BeaEngine-64.dll $(TargetDir)BeaEngine-64.dll</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
