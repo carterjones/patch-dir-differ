@@ -1,9 +1,9 @@
 ﻿namespace PatchDirDiffer
 {
     using System;
-    using System.Runtime.InteropServices;
-    using System.Linq;
     using System.Diagnostics;
+    using System.Linq;
+    using System.Runtime.InteropServices;
 
     /// <summary>
     /// A collection of extension methods that add extra functionality to existing .NET classes.

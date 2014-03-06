@@ -5,6 +5,7 @@
 !*.resx
 !*.settings
 !*.sln
+!*.StyleCop
 !*.vcxproj
 !PatchDirDiffer
 !PatchDirDiffer/Properties
