@@ -95,6 +95,7 @@
                         // PE format
                         case ".dll":
                         case ".exe":
+                        case ".sys":
                             byte[] unpatchedBytes = File.ReadAllBytes(absoluteUnpatchedPath);
                             byte[] patchedBytes = File.ReadAllBytes(absolutePatchedPath);
                             Disassembler d = new Disassembler();
