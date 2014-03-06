@@ -181,7 +181,7 @@
         /// </summary>
         private static void PrintUsage()
         {
-            Console.WriteLine("usage: " + Process.GetCurrentProcess().ProcessName + " <unpatched dir> <patched dir>");
+            Console.WriteLine("usage: " + Process.GetCurrentProcess().ProcessName + " <unpatched_dir> <patched_dir>");
         }
 
         /// <summary>

@@ -7,4 +7,4 @@ sys) will be disassembled, followed by a plaintext diff of the disassembly.
 The output can be found in diff.html in the same directory as the
 PatchDirDiffer.exe file.
 
-    usage: PatchDirDiffer <unpatched dir> <patched dir>
+    usage: PatchDirDiffer <unpatched_dir> <patched_dir>
