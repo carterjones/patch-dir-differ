@@ -115,7 +115,7 @@
                             {
                                 unpatchedText = string.Empty;
                                 patchedText = string.Empty;
-                                diffData = e.Message;
+                                diffData = e.Message + "\n" + e.StackTrace;
                             }
 
                             break;
